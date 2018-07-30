@@ -41,6 +41,8 @@ namespace tcpclient
 
         public int count = 1;//计数的初始化 
 
+        bool H_ok;//用来判断是否接收到高电平信号
+
         float num1;//接收数据的代码中，代表测出的实际数值
 
         Thread t1;
@@ -71,7 +73,7 @@ namespace tcpclient
         // 2 - 亮红灯-不合格
         // 3 - 黄灯闪烁-监测中
         // 4 - 亮蓝灯-保存文件
-        //int lightcon = 0;
+        int lightcon = 0;
         bool toggle_light = false; // 是否需要黄灯闪烁
         int yellow_toggle = 0;
         //=======================================================
@@ -165,7 +167,138 @@ namespace tcpclient
             //================================================
         }
 
+        public client()
+        {
 
+            InitializeComponent();
+            textBox1.Text = "192.168.2.99";//DL-EN1的IP是根据IP configurator设定的IP,
+            textBox2.Text = "64000"; //DL-EN1的端口号也可以在IP configurator上进行修改，默认为64000
+
+        }
+
+        private void button1_Click(object sender, EventArgs e)//建立连接，启动串口、IP
+        {
+            comportconthread = new Thread(new ThreadStart(ComportConnection));
+            comportconthread.Start();
+
+            Tcpserverthread = new Thread(new ThreadStart(Connection));
+            Tcpserverthread.Start();
+
+        }
+
+        private void send_Click(object sender, EventArgs e)
+        {
+
+
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            richTextBox2.Text += "-----与服务器断开连接------\n";
+            button2.Enabled = false;
+            send.Enabled = false;
+            button1.Enabled = true;
+            textBox1.Enabled = true;
+            textBox2.Enabled = true;
+            try
+            {
+                Tcpsendthread.Abort();
+                Tcprecvthread.Abort();
+                Tcpserverthread.Abort();
+                t1.Abort();
+            }
+            catch (Exception a)
+            {
+                Console.WriteLine(a);
+            }
+            comm.Close();//dy---串口关闭
+            netstream.Dispose();
+            netstream.Close();
+            client01.Close();
+        }
+
+
+        private void ComportConnection()   //连接串口
+        {
+
+            comm.PortName = combo_PortName.Text;
+            //comm.BaudRate = int.Parse(combo_Baudrate.Text);
+
+            // ------------------------Liu 打开失败要停止流程防止错误 --------------------------
+            try
+            {
+                comm.Open();
+            }
+            catch (Exception ex)
+            {
+                //创建一个新的comm对象
+                comm = new SerialPort();
+                //异常信息
+                MessageBox.Show(ex.Message);
+                return;
+            }
+            richTextBox2.Text += "------串口已连接------\n";
+            comm.Write(digital_input, 0, 8);
+            this.timer1.Start();
+
+        }
+
+
+        void comm_DataReceived(object sender, SerialDataReceivedEventArgs e)//串口接收信息
+        {
+            int n = comm.BytesToRead;
+
+            portreceived_count += n;//增加接收计数
+            comm.Read(recv_buff, 0, n);//读取缓冲数据
+
+            // Liu - Plan B 无脑收，只管是不是该清空了
+            batch_received_count += n;
+            for (int i = 0; i < n; i++)
+            {
+                //System.Diagnostics.Debug.WriteLine("###DEBUG### laser_data_index is {0}", laser_data_index);
+                digital_output[laser_data_index++] = recv_buff[i];
+            }
+
+        }
+
+        // 添加定时器1，判断串口是否接收完整---01，02，01，08，A0，4E--- 
+        private void timer1_Tick(object sender, EventArgs e)//在timer1的属性中，一定要把事件timer1_Tick激活，此事件是隔多久访问一次
+        {
+            // 添加数据处理、解析部分
+            //System.Diagnostics.Debug.WriteLine("###DEBUG### Timer1 - batch_received_count is {0}", batch_received_count);
+            if (batch_received_count == 6)//判断是否接受了6位数据---01，02，01，08，A0，4E---
+            {
+                richTextBox2.Text += "------data success------\n";
+                //System.Diagnostics.Debug.WriteLine("###DEBUG### Timer1 - Recv_buff 6 is {0}", recv_buff[6]);
+                comportReceived(digital_output); // 这个函数里，开始关中断、结束开中断，保证了时序合理。
+
+            }
+            else if (recv_OK == false)
+            {
+                System.Diagnostics.Debug.WriteLine("Timer1 -- receive not OK!");
+                //program_START = false;
+            }
+        }
+        private void comportReceived(byte[] digital_output)//判断好串口接收到完整的数据，进行数据处理
+        {
+            this.timer1.Stop();
+            H_ok = digital_output[3] == 0x08;//H_ok是true，就是接收到高电平，H_ok是false，就是低电平
+            if (H_ok == true)
+            {
+                Tcpsendthread = new Thread(new ThreadStart(senddata));//有0x08出现，表示刀具进入到位，开始刀具高度测量
+                Tcpsendthread.Start();
+                richTextBox2.Text += "------port data success------\n";
+
+                batch_received_count = 0;
+                laser_data_index = 0;
+                comm.Write(digital_input, 0, 8);
+            }
+            else if (H_ok == false)
+            {
+                this.timer1.Start();
+                richTextBox2.Text += "------Wait High messsage------\n";
+            }
+        }
         
         private void Connection()   //连接tcp-服务器的方法
         {
@@ -267,7 +400,7 @@ namespace tcpclient
                     //num1 = (300 - num / 100);
                     richTextBox2.Text += "" + System.DateTime.Now.ToLongTimeString() + "测量值：" + num1 + "\n";//输出返回消息
 
-                    if (  num1 < 620 && num1 > 600)//数据的上下限
+                    if ( num1 < 620 && num1 > 600 )//数据的上下限
                     {
                         count++;
 
@@ -286,6 +419,8 @@ namespace tcpclient
                         // 黄灯停止闪烁
                         toggle_light = false;
                     }
+
+                    this.timer1.Start();
 
                     if (height_data_num == 20) //dy----10表示测量了10个数据开始保存起来 
                     {
@@ -375,7 +510,6 @@ namespace tcpclient
                 else
                     //lightcon = 2;
 
-
                 // 开始绘制
                 ThreadFunction();
             }
@@ -418,141 +552,8 @@ namespace tcpclient
                         pictureBox_LED.Image = imageList1.Images[0];
                         yellow_toggle = 0;
                     }
-
                 }
             }
-        }
-
-        public client()
-        {
-            
-            InitializeComponent();
-            textBox1.Text = "192.168.2.99";//DL-EN1的IP是根据IP configurator设定的IP,
-            textBox2.Text = "64000"; //DL-EN1的端口号也可以在IP configurator上进行修改，默认为64000
-            
-        }
-        
-        private void button1_Click(object sender, EventArgs e)
-        {
-            comportconthread = new Thread(new ThreadStart(ComportConnection));
-            comportconthread.Start();
-            
-            Tcpserverthread = new Thread(new ThreadStart(Connection));
-            Tcpserverthread.Start();
-
-        }
-
-        private void send_Click(object sender, EventArgs e)
-        {
-           
-                    
-        }
-
-        private void button2_Click(object sender, EventArgs e)
-        {
-            richTextBox2.Text += "-----与服务器断开连接------\n";
-            button2.Enabled = false;
-            send.Enabled = false;
-            button1.Enabled = true;
-            textBox1.Enabled = true;
-            textBox2.Enabled = true;
-            try
-            {
-                Tcpsendthread.Abort();
-                Tcprecvthread.Abort();
-                Tcpserverthread.Abort();
-                t1.Abort();
-            }
-            catch (Exception a)
-            {
-                Console.WriteLine(a);
-            }
-            comm.Close();//dy---串口关闭
-            netstream.Dispose();
-            netstream.Close();
-            client01.Close();                      
-        }
-      
-
-        private void ComportConnection()   //连接串口
-        {
-            
-                comm.PortName = combo_PortName.Text;
-                //  comm.BaudRate = int.Parse(combo_Baudrate.Text);
-                 // ------------------------Liu 打开失败要停止流程防止错误 --------------------------
-                try
-                {
-                    comm.Open();
-                }
-                catch (Exception ex)
-                {
-                    //创建一个新的comm对象
-                    comm = new SerialPort();
-                    //异常信息
-                    MessageBox.Show(ex.Message);
-                    return;
-                }                                                             
-                richTextBox2.Text += "------串口连接------\n";
-                comm.Write(digital_input, 0, 8);
-                this.timer1.Start();
-
-            
-            
-        }        
-
- 
-        void comm_DataReceived(object sender, SerialDataReceivedEventArgs e)//串口接收信息
-        
-        {
-            int n = comm.BytesToRead;
-
-            portreceived_count += n;//增加接收计数
-            comm.Read(recv_buff, 0, n);//读取缓冲数据
-
-            // Liu - Plan B 无脑收，只管是不是该清空了
-            batch_received_count += n;
-            for (int i = 0; i < n; i++)
-            {
-                //System.Diagnostics.Debug.WriteLine("###DEBUG### laser_data_index is {0}", laser_data_index);
-                digital_output[laser_data_index++] = recv_buff[i];
-            }
-            
-        }
-
-        // 添加定时器1，判断串口是否接收完整---01，02，01，08，A0，4E--- 
-        private void timer1_Tick(object sender, EventArgs e)
-        {
-            // 添加数据处理、解析部分
-            //System.Diagnostics.Debug.WriteLine("###DEBUG### Timer1 - batch_received_count is {0}", batch_received_count);
-            if (batch_received_count == 6)//判断是否接受了6位数据---01，02，01，08，A0，4E---
-            {
-                richTextBox2.Text += "------data success------\n"; 
-                //System.Diagnostics.Debug.WriteLine("###DEBUG### Timer1 - Recv_buff 6 is {0}", recv_buff[6]);
-                comportReceived(digital_output); // 这个函数里，开始关中断、结束开中断，保证了时序合理。
-
-            }
-            else if (recv_OK == false)
-            {
-                System.Diagnostics.Debug.WriteLine("Timer1 -- receive not OK!");
-                //program_START = false;
-            }
-        }
-        private void comportReceived(byte[] digital_output)//判断好串口接收到完整的数据，进行数据处理
-        {
-            this.timer1.Stop();
-            if (digital_output[3]==0x08)
-            {
-                Tcpsendthread = new Thread(new ThreadStart(senddata));//有0x08出现，开始刀具高度测量
-                Tcpsendthread.Start();
-                richTextBox2.Text += "------port data success------\n";
-
-                batch_received_count = 0;
-                laser_data_index = 0;
-                comm.Write(digital_input, 0, 8);
-                this.timer1.Start();
-                   
-            }           
-        }
-
+        }      
     }
 }
