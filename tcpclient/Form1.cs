@@ -41,7 +41,7 @@ namespace tcpclient
 
         public int count = 1;//计数的初始化 
 
-        bool H_ok;//用来判断是否接收到高电平信号
+        bool H_ok;//用来判断是否接收到高电平信号。。。。
 
         float num1;//接收数据的代码中，代表测出的实际数值
 
@@ -282,13 +282,12 @@ namespace tcpclient
         private void comportReceived(byte[] digital_output)//判断好串口接收到完整的数据，进行数据处理
         {
             this.timer1.Stop();
-            H_ok = digital_output[3] == 0x08;//H_ok是true，就是接收到高电平，H_ok是false，就是低电平
+            H_ok = digital_output[3] == 0x08;//H_ok是true，就是接收到高电平，H_ok是false，就是低电平；
             if (H_ok == true)
             {
                 Tcpsendthread = new Thread(new ThreadStart(senddata));//有0x08出现，表示刀具进入到位，开始刀具高度测量
                 Tcpsendthread.Start();
                 richTextBox2.Text += "------port data success------\n";
-
                 batch_received_count = 0;
                 laser_data_index = 0;
                 comm.Write(digital_input, 0, 8);
@@ -296,7 +295,7 @@ namespace tcpclient
             else if (H_ok == false)
             {
                 this.timer1.Start();
-                richTextBox2.Text += "------Wait High messsage------\n";
+                richTextBox2.Text += "------Wait High messsage---\n";
             }
         }
         
