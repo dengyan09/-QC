@@ -282,22 +282,12 @@ namespace tcpclient
         private void comportReceived(byte[] digital_output)//判断好串口接收到完整的数据，进行数据处理
         {
             this.timer1.Stop();
-            H_ok = digital_output[3] == 0x08;//H_ok是true，就是接收到高电平，H_ok是false，就是低电平；
-            if (H_ok == true)
-            {
-                Tcpsendthread = new Thread(new ThreadStart(senddata));//有0x08出现，表示刀具进入到位，开始刀具高度测量
-                Tcpsendthread.Start();
-                richTextBox2.Text += "------port data success------\n";
-                batch_received_count = 0;
-                laser_data_index = 0;
-                comm.Write(digital_input, 0, 8);
-            }
-            else if (H_ok == false)
-            {
-                this.timer1.Start();
-                richTextBox2.Text += "------Wait High messsage---\n";
-            }
+            H_ok = digital_output[3] == 0x08;//H_ok是true，就是接收到高电平，H_ok是false，就是低电平； 
+            Tcpsendthread = new Thread(new ThreadStart(senddata));//有0x08出现，表示刀具进入到位，开始刀具高度测量
+            Tcpsendthread.Start();
         }
+            
+       
         
         private void Connection()   //连接tcp-服务器的方法
         {
@@ -346,7 +336,8 @@ namespace tcpclient
         private void senddata() //tcp-发送数据
         {
 
-            // 向服务端发送字符串,,,,,试试能不能用，string Command = "M0"; byte[] buf = Encoding.ASCII.GetBytes(Command);            
+            // 向服务端发送字符串,,,,,试试能不能用，string Command = "M0"; byte[] buf = Encoding.ASCII.GetBytes(Command);
+                     
             int i;
             for (i = 0; i < count; i++)
             {
@@ -369,7 +360,7 @@ namespace tcpclient
         {                       
             byte[] bytes = new byte[1024];           
             int bytesRead;                      
-            while (true)
+            while ( H_ok == true )//只要接收到高电平，08，一直循环
             {
                 try
                 {
@@ -384,6 +375,7 @@ namespace tcpclient
                     break;
                 }
                 string message = System.Text.Encoding.UTF8.GetString(bytes, 0, bytesRead);
+                richTextBox2.Text += "------Port data right------\n";
 
                 //dy--------------------M0测量值指令----------------
                 string[] sArray;
@@ -398,32 +390,32 @@ namespace tcpclient
                     num1 = (600 - num / 100);//激光器的型号，IL300----600                   
                     //num1 = (300 - num / 100);
                     richTextBox2.Text += "" + System.DateTime.Now.ToLongTimeString() + "测量值：" + num1 + "\n";//输出返回消息
+                     // 黄灯闪烁表示测量开始
+                    toggle_light = true;
+                    Flash_Yellow_LED();
 
-                    if ( num1 < 620 && num1 > 600 )//数据的上下限
-                    {
+                    //if ( num1 < 620 && num1 > 600 )//数据的上下限---7-31-不要上下限，只需要高低电平来判断
+                    //{
                         count++;
 
-                        if (height_data_num < 512)
+                        if (height_data_num < 512)//给测量的数据设了上限，512
                             height_data[height_data_num++] = num1;
                         else
                             height_data_num = 1000;
 
-                        // 黄灯闪烁表示测量开始
-                        toggle_light = true;
-                        Flash_Yellow_LED();
-                    }
-                    else
-                    {
-                        count = 0;
+                       
+                    //}
+                    //else
+                    //{
+                        //count = 0;
                         // 黄灯停止闪烁
-                        toggle_light = false;
-                    }
+                        //toggle_light = false;
+                    //}
 
-                    this.timer1.Start();
 
-                    if (height_data_num == 20) //dy----10表示测量了10个数据开始保存起来 
-                    {
-                        StreamWriter sw = new StreamWriter("knife" + Knife_num, false);
+                    //if (height_data_num == 20) //dy----20表示测量了10个数据开始保存起来 
+                    //{
+                        StreamWriter sw = new StreamWriter("knife" + Knife_num, false);//7-31--数据直接保存，只要在高电平，08里面。 
                         for (int i = 0; i < height_data_num; i++)
                         {
                             sw.WriteLine("{0}", height_data[i]);
@@ -433,10 +425,24 @@ namespace tcpclient
                         sw.Close();
                         height_data_num = 0;
                         pictureBox_LED.Image = imageList1.Images[4];//保存文件显示蓝色指示灯
-                    }
+                   // }
 
                 }
             }
+            while ( H_ok == false )//只要是低电平，一直循环
+            {
+                richTextBox2.Text += "------Wait High messsage---\n";
+                if (count != 0)
+                { 
+                
+                
+                }
+
+                    
+                            
+            }
+
+
         }       
              
         //============================多线程相关函数=======================================
@@ -503,11 +509,7 @@ namespace tcpclient
                 stdeval_db = Math.Round(Convert.ToDouble(stdeval_db), 2, MidpointRounding.AwayFromZero);//dy------保留2位小数点
                 // stdeval_db = System.Math.Sqrt(stdeval_db); // 这是标准差
 
-                // 质量判定----有待改正-----dy
-                if (average_db < 1)//直接判断均值的范围
-                    pictureBox_LED.Image = imageList1.Images[1];
-                else
-                    //lightcon = 2;
+                
 
                 // 开始绘制
                 ThreadFunction();
@@ -525,7 +527,12 @@ namespace tcpclient
                 // this.textBox1.Text = DateTime.Now.ToString();
                 chart1.Series[0].Points.DataBindXY(chart_x_index, delta_height);
                 textBox4.Text = average_db.ToString();
-                textBox3.Text = stdeval_db.ToString();                
+                textBox3.Text = stdeval_db.ToString();
+
+                if (average_db < 1)//直接判断均值的范围，dy---7-31--质量判定
+                    pictureBox_LED.Image = imageList1.Images[1];
+                else
+                    pictureBox_LED.Image = imageList1.Images[2];
             }
         }
 
