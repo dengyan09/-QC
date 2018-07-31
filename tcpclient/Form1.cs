@@ -25,11 +25,12 @@ namespace tcpclient
         NetworkStream netstream = null;//Deng--将 类NetworkStream实例化为netstream，并初始化为空（null）。。NetworkStream提供在阻止模式下通过 Stream 套接字发送和接收数据的方法
         private StreamReader strReader;//Deng--实现一个 TextReader，使其以一种特定的编码从字节流中读取字符。namespace System.IO
         private StreamWriter strWriter;//Deng--TextReader 为 StreamReader 和 StringReader 的抽象基类，它们分别从流和字符串读取字符。 使用这些派生类可打开一个文本文件以读取指定范围的字符，或基于现有的流创建一个读取器。 
-        
+
+        private Thread comportconthread = null;//串口连接线程
         private Thread Tcprecvthread = null;//TCP接收信息线程
         private Thread Tcpsendthread = null;//TCP发送信息线程
         private Thread Tcpserverthread = null;//TCP服务线程
-        private Thread comportconthread = null;//串口连接线程
+       
         //private Thread comportsendthread = null;//串口发送线程
 
         //bool tag = true;//设置标志位，标志是否接收数据,当断开连接的时候，tag=false，表示不接收数据
@@ -41,7 +42,7 @@ namespace tcpclient
 
         public int count = 1;//计数的初始化 
 
-        bool H_ok;//用来判断是否接收到高电平信号。。。。
+        public bool H_ok;//用来判断是否接收到高电平信号。。。。
 
         float num1;//接收数据的代码中，代表测出的实际数值
 
@@ -73,7 +74,7 @@ namespace tcpclient
         // 2 - 亮红灯-不合格
         // 3 - 黄灯闪烁-监测中
         // 4 - 亮蓝灯-保存文件
-        int lightcon = 0;
+        //int lightcon = 0;
         bool toggle_light = false; // 是否需要黄灯闪烁
         int yellow_toggle = 0;
         //=======================================================
@@ -183,6 +184,7 @@ namespace tcpclient
 
             Tcpserverthread = new Thread(new ThreadStart(Connection));
             Tcpserverthread.Start();
+            
 
         }
 
@@ -212,6 +214,7 @@ namespace tcpclient
                 Console.WriteLine(a);
             }
             comm.Close();//dy---串口关闭
+            this.timer1.Stop();
             netstream.Dispose();
             netstream.Close();
             client01.Close();
@@ -265,11 +268,11 @@ namespace tcpclient
         private void timer1_Tick(object sender, EventArgs e)//在timer1的属性中，一定要把事件timer1_Tick激活，此事件是隔多久访问一次
         {
             // 添加数据处理、解析部分
-            //System.Diagnostics.Debug.WriteLine("###DEBUG### Timer1 - batch_received_count is {0}", batch_received_count);
+            
             if (batch_received_count == 6)//判断是否接受了6位数据---01，02，01，08，A0，4E---
             {
-                richTextBox2.Text += "------data success------\n";
-                //System.Diagnostics.Debug.WriteLine("###DEBUG### Timer1 - Recv_buff 6 is {0}", recv_buff[6]);
+                batch_received_count = 0;
+                laser_data_index = 0;
                 comportReceived(digital_output); // 这个函数里，开始关中断、结束开中断，保证了时序合理。
 
             }
@@ -282,10 +285,23 @@ namespace tcpclient
         private void comportReceived(byte[] digital_output)//判断好串口接收到完整的数据，进行数据处理
         {
             this.timer1.Stop();
-            H_ok = digital_output[3] == 0x08;//H_ok是true，就是接收到高电平，H_ok是false，就是低电平； 
-            Tcpsendthread = new Thread(new ThreadStart(senddata));//有0x08出现，表示刀具进入到位，开始刀具高度测量
-            Tcpsendthread.Start();
+
+            
+            
+            H_ok = digital_output[3] == 0x08;
+            if (H_ok)
+                System.Diagnostics.Debug.WriteLine("=============H_ok is high");
+            else
+                System.Diagnostics.Debug.WriteLine("=============H_ok is low");
+            //H_ok是true，就是接收到高电平，H_ok是false，就是低电平；    
+
+
+            this.timer1.Start();
+            comm.Write(digital_input, 0, 8);
+            return;
+            
         }
+
             
        
         
@@ -302,6 +318,9 @@ namespace tcpclient
                 netstream = client01.GetStream();//返回用于发送和接收的数据流
                 strReader = new StreamReader(netstream);
                 strWriter = new StreamWriter(netstream);
+
+                Tcpsendthread = new Thread(new ThreadStart(senddata));
+                Tcpsendthread.Start();
 
                 Tcprecvthread = new Thread(new ThreadStart(recvdata)); //创建接收信息线程，并启动
                 Tcprecvthread.Start();
@@ -337,112 +356,118 @@ namespace tcpclient
         {
 
             // 向服务端发送字符串,,,,,试试能不能用，string Command = "M0"; byte[] buf = Encoding.ASCII.GetBytes(Command);
-                     
-            int i;
-            for (i = 0; i < count; i++)
-            {
-                try
+            //if (H_ok)
+            //{
+                int i;
+                for (i = 0; i < count; i++)
                 {
-                    string txtContent = "M0";
-                    strWriter.WriteLine(txtContent);//往当前的数据流中写入一行字符串
-                    richTextBox2.Text += "" + System.DateTime.Now.ToLongTimeString() + "指令：" + txtContent + "\n";
-                    strWriter.Flush();//刷新当前数据流中的数据，释放网络流对象                                      
-                    Thread.Sleep(500);
+                    try
+                    {
+                        string txtContent = "M0";
+                        strWriter.WriteLine(txtContent);//往当前的数据流中写入一行字符串
+                        richTextBox2.Text += "" + System.DateTime.Now.ToLongTimeString() + "指令：" + txtContent + "\n";
+                        strWriter.Flush();//刷新当前数据流中的数据，释放网络流对象                                      
+                        Thread.Sleep(1000);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(ex.Message, "异常操作！");
+                    }
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message, "异常操作！");
-                }
-            }
+            //}
+            //else
+            //richTextBox2.Text += "------现在无刀具------\n";
+            System.Diagnostics.Debug.WriteLine("===Send is return!===");
         }
 
         private void recvdata()  //tcp-接收数据
         {                       
             byte[] bytes = new byte[1024];           
-            int bytesRead;                      
-            while ( H_ok == true )//只要接收到高电平，08，一直循环
-            {
-                try
-                {
-                    bytesRead = netstream.Read(bytes, 0, bytes.Length);
-                }
-                catch (Exception)
-                {
-                    break;
-                }
-                if (bytesRead == 0)
-                {
-                    break;
-                }
-                string message = System.Text.Encoding.UTF8.GetString(bytes, 0, bytesRead);
-                richTextBox2.Text += "------Port data right------\n";
+            int bytesRead = 0;                      
+           while ( true )
+           {
+                if ( H_ok == true )
+                { 
+                    try
+                    {
+                        bytesRead = netstream.Read(bytes, 0, bytes.Length);
+                    }
+                     catch (Exception)
+                    {
+                        System.Diagnostics.Debug.WriteLine("===read failed!===");
+                        break;
+                    }
+                    if (bytesRead == 0)
+                    {
+                        System.Diagnostics.Debug.WriteLine("===nothing read!===");
+                        break;
+                    }
 
-                //dy--------------------M0测量值指令----------------
-                string[] sArray;
-                //接收数据是否存在"M0,"
-                if (message.Contains("M0,"))
-                {
-                    //得到"M0,"以外字串
-                    sArray = message.Split(new string[] { "M0," }, StringSplitOptions.RemoveEmptyEntries);
-                    //去掉字串中的空格
-                    string temp = sArray[0];
-                    float num = float.Parse(temp);
-                    num1 = (600 - num / 100);//激光器的型号，IL300----600                   
-                    //num1 = (300 - num / 100);
-                    richTextBox2.Text += "" + System.DateTime.Now.ToLongTimeString() + "测量值：" + num1 + "\n";//输出返回消息
-                     // 黄灯闪烁表示测量开始
-                    toggle_light = true;
-                    Flash_Yellow_LED();
+                    string message = System.Text.Encoding.UTF8.GetString(bytes, 0, bytesRead);
+                    richTextBox2.Text += "------Port data right------\n";
 
-                    //if ( num1 < 620 && num1 > 600 )//数据的上下限---7-31-不要上下限，只需要高低电平来判断
-                    //{
+                    //dy--------------------M0测量值指令----------------
+                    string[] sArray;
+                     //接收数据是否存在"M0,"
+                    if (message.Contains("M0,"))
+                    {
+                        //得到"M0,"以外字串
+                        sArray = message.Split(new string[] { "M0," }, StringSplitOptions.RemoveEmptyEntries);
+                         //去掉字串中的空格
+                        string temp = sArray[0];
+                        float num = float.Parse(temp);
+                        num1 = (600 - num / 100);//激光器的型号，IL300----600                   
+                        //num1 = (300 - num / 100);
+                        richTextBox2.Text += "" + System.DateTime.Now.ToLongTimeString() + "测量值：" + num1 + "\n";//输出返回消息
+                        // 黄灯闪烁表示测量开始
+                        toggle_light = true;
+                        Flash_Yellow_LED();
+
+                        //if ( num1 < 620 && num1 > 600 )//数据的上下限---7-31-不要上下限，只需要高低电平来判断
+                        //{
                         count++;
 
                         if (height_data_num < 512)//给测量的数据设了上限，512
                             height_data[height_data_num++] = num1;
                         else
-                            height_data_num = 1000;
+                            height_data_num = 512;
+                    }
+                }
+            
+                //else
+                //{
+                //count = 0;
+                // 黄灯停止闪烁
+                //toggle_light = false;
+                //}
 
-                       
-                    //}
-                    //else
-                    //{
-                        //count = 0;
-                        // 黄灯停止闪烁
-                        //toggle_light = false;
-                    //}
 
+                if ( H_ok == false ) //dy----H_ok == false表示测量低电平,开始保存起来--7-31 
+                {
 
-                    //if (height_data_num == 20) //dy----20表示测量了10个数据开始保存起来 
-                    //{
+                    if (height_data_num !=0 )
+                    {
+                        System.Diagnostics.Debug.WriteLine("===Saving!===");
+
                         StreamWriter sw = new StreamWriter("knife" + Knife_num, false);//7-31--数据直接保存，只要在高电平，08里面。 
                         for (int i = 0; i < height_data_num; i++)
                         {
-                            sw.WriteLine("{0}", height_data[i]);
+                           sw.WriteLine("{0}", height_data[i]);
                         }
                         Knife_num++;
                         sw.Flush();
                         sw.Close();
                         height_data_num = 0;
                         pictureBox_LED.Image = imageList1.Images[4];//保存文件显示蓝色指示灯
-                   // }
-
-                }
-            }
-            while ( H_ok == false )//只要是低电平，一直循环
-            {
-                richTextBox2.Text += "------Wait High messsage---\n";
-                if (count != 0)
-                { 
-                
-                
-                }
-
+                    }
                     
-                            
+
+                }
+
+
+
+
             }
-
-
         }       
              
         //============================多线程相关函数=======================================
