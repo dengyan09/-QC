@@ -66,6 +66,9 @@ namespace tcpclient
         double average_db = 0;  // 平均值
         double stdeval_db = 0;  // 标准差-但是目前输出的是方差
 
+
+        bool tcp_SR = true;//8-1--判断TCP的发送与接收
+
         bool thread_exit = false;
 
         //-- 指示灯状态 --
@@ -284,17 +287,13 @@ namespace tcpclient
         }
         private void comportReceived(byte[] digital_output)//判断好串口接收到完整的数据，进行数据处理
         {
-            this.timer1.Stop();
-
-            
-            
+            this.timer1.Stop();           
             H_ok = digital_output[3] == 0x08;
             if (H_ok)
                 System.Diagnostics.Debug.WriteLine("=============H_ok is high");
             else
                 System.Diagnostics.Debug.WriteLine("=============H_ok is low");
             //H_ok是true，就是接收到高电平，H_ok是false，就是低电平；    
-
 
             this.timer1.Start();
             comm.Write(digital_input, 0, 8);
@@ -354,13 +353,47 @@ namespace tcpclient
 
         private void senddata() //tcp-发送数据
         {
-
-            // 向服务端发送字符串,,,,,试试能不能用，string Command = "M0"; byte[] buf = Encoding.ASCII.GetBytes(Command);
-            //if (H_ok)
-            //{
-                int i;
-                for (i = 0; i < count; i++)
+            while ( true )
+            {
+                //System.Diagnostics.Debug.WriteLine("===Send is return!===");
+                /*
+                if (H_ok == true )
                 {
+                    if (tcp_SR)
+                    {
+                        tcp_SR = false;
+                        //int i;
+                        //for (i = 0; i < count; i++)
+                        //{
+                        try
+                        {
+                            string txtContent = "M0";
+                            strWriter.WriteLine(txtContent);//往当前的数据流中写入一行字符串
+                            richTextBox2.Text += "" + System.DateTime.Now.ToLongTimeString() + "指令：" + txtContent + "\n";
+                            strWriter.Flush();//刷新当前数据流中的数据，释放网络流对象                                      
+                            Thread.Sleep(1000);
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show(ex.Message, "异常操作！");
+                        }
+                        // }
+                    }
+                }
+                else
+                {
+                    ;
+                ;
+                    //richTextBox2.Text += "------现在无刀具------\n";
+                // System.Diagnostics.Debug.WriteLine("===Send is return!===");
+                }
+                */
+                if (tcp_SR)
+                {
+                    tcp_SR = false;
+                    //int i;
+                    //for (i = 0; i < count; i++)
+                    //{
                     try
                     {
                         string txtContent = "M0";
@@ -373,12 +406,12 @@ namespace tcpclient
                     {
                         MessageBox.Show(ex.Message, "异常操作！");
                     }
+                    // }
                 }
-            //}
-            //else
-            //richTextBox2.Text += "------现在无刀具------\n";
-            System.Diagnostics.Debug.WriteLine("===Send is return!===");
+
+            }
         }
+
 
         private void recvdata()  //tcp-接收数据
         {                       
@@ -386,88 +419,152 @@ namespace tcpclient
             int bytesRead = 0;                      
            while ( true )
            {
-                if ( H_ok == true )
-                { 
-                    try
-                    {
-                        bytesRead = netstream.Read(bytes, 0, bytes.Length);
-                    }
-                     catch (Exception)
-                    {
-                        System.Diagnostics.Debug.WriteLine("===read failed!===");
-                        break;
-                    }
-                    if (bytesRead == 0)
-                    {
-                        System.Diagnostics.Debug.WriteLine("===nothing read!===");
-                        break;
-                    }
+                //if ( H_ok == true )
+                //{
+                //    //tcp_SR = false;//tcp-发送端先不发送
+                //    try
+                //    {
+                //        bytesRead = netstream.Read(bytes, 0, bytes.Length);
+                //    }
+                //     catch (Exception)
+                //    {
+                //        System.Diagnostics.Debug.WriteLine("===read failed!===");
+                //        break;
+                //    }
+                //    if (bytesRead == 0)
+                //    {
+                //        System.Diagnostics.Debug.WriteLine("===nothing read!===");
+                //        break;
+                //    }
 
-                    string message = System.Text.Encoding.UTF8.GetString(bytes, 0, bytesRead);
-                    richTextBox2.Text += "------Port data right------\n";
+                //    string message = System.Text.Encoding.UTF8.GetString(bytes, 0, bytesRead);
+                //    richTextBox2.Text += "------Port data right------\n";
 
-                    //dy--------------------M0测量值指令----------------
-                    string[] sArray;
-                     //接收数据是否存在"M0,"
-                    if (message.Contains("M0,"))
+                //    //dy--------------------M0测量值指令----------------
+                //    string[] sArray;
+                //     //接收数据是否存在"M0,"
+                //    if (message.Contains("M0,"))
+                //    {
+                //        //得到"M0,"以外字串
+                //        sArray = message.Split(new string[] { "M0," }, StringSplitOptions.RemoveEmptyEntries);
+                //         //去掉字串中的空格
+                //        string temp = sArray[0];
+                //        float num = float.Parse(temp);
+                //        num1 = (600 - num / 100);//激光器的型号，IL300----600                   
+                //        //num1 = (300 - num / 100);
+                //        richTextBox2.Text += "" + System.DateTime.Now.ToLongTimeString() + "测量值：" + num1 + "\n";//输出返回消息
+                //        // 黄灯闪烁表示测量开始
+                //        toggle_light = true;
+                //        Flash_Yellow_LED();
+
+                //        //if ( num1 < 620 && num1 > 600 )//数据的上下限---7-31-不要上下限，只需要高低电平来判断
+                //        //{
+                //        count++;
+
+                //        if (height_data_num < 512)//给测量的数据设了上限，512
+                //            height_data[height_data_num++] = num1;
+                //        else
+                //            height_data_num = 512;
+
+                //        tcp_SR = true;
+                //    }
+                //    //tcp_SR = true;//tcp-发送端继续发送
+                //}
+                //else
+                //{
+                //    System.Diagnostics.Debug.WriteLine("===Saving!===");
+                //     if (height_data_num != 0) //dy----H_ok == false表示测量低电平,开始保存起来--7-31 //tcp_SR = false;//不发送TCP--8-1
+                //     {
+                //        StreamWriter sw = new StreamWriter("knife" + Knife_num, false);//7-31--数据直接保存，只要在高电平，08里面。 
+                //        for (int i = 0; i < height_data_num; i++)
+                //        {
+                //           sw.WriteLine("{0}", height_data[i]);
+                //        }
+                //        Knife_num++;
+                //        sw.Flush();
+                //        sw.Close();
+                //        height_data_num = 0;
+                //        pictureBox_LED.Image = imageList1.Images[4];//保存文件显示蓝色指示灯
+
+                //     }
+                //}
+
+
+
+                
+                    //tcp_SR = false;//tcp-发送端先不发送
+                try
+                {
+                    bytesRead = netstream.Read(bytes, 0, bytes.Length);
+                }
+                catch (Exception)
+                {
+                    System.Diagnostics.Debug.WriteLine("===read failed!===");
+                    break;
+                }
+                if (bytesRead == 0)
+                {
+                    System.Diagnostics.Debug.WriteLine("===nothing read!===");
+                    break;
+                }
+
+                string message = System.Text.Encoding.UTF8.GetString(bytes, 0, bytesRead);
+                richTextBox2.Text += "------Port data right------\n";
+
+                //dy--------------------M0测量值指令----------------
+                string[] sArray;
+                //接收数据是否存在"M0,"
+                if (message.Contains("M0,"))
+                {
+                    //得到"M0,"以外字串
+                    sArray = message.Split(new string[] { "M0," }, StringSplitOptions.RemoveEmptyEntries);
+                    //去掉字串中的空格
+                    string temp = sArray[0];
+                    float num = float.Parse(temp);
+                    num1 = (600 - num / 100);//激光器的型号，IL300----600                   
+                    //num1 = (300 - num / 100);
+                    richTextBox2.Text += "" + System.DateTime.Now.ToLongTimeString() + "测量值：" + num1 + "\n";//输出返回消息
+                    // 黄灯闪烁表示测量开始
+                    toggle_light = true;
+                    Flash_Yellow_LED();
+
+                    //if ( num1 < 620 && num1 > 600 )//数据的上下限---7-31-不要上下限，只需要高低电平来判断
+                    //{
+                    count++;
+
+                    if (H_ok)
                     {
-                        //得到"M0,"以外字串
-                        sArray = message.Split(new string[] { "M0," }, StringSplitOptions.RemoveEmptyEntries);
-                         //去掉字串中的空格
-                        string temp = sArray[0];
-                        float num = float.Parse(temp);
-                        num1 = (600 - num / 100);//激光器的型号，IL300----600                   
-                        //num1 = (300 - num / 100);
-                        richTextBox2.Text += "" + System.DateTime.Now.ToLongTimeString() + "测量值：" + num1 + "\n";//输出返回消息
-                        // 黄灯闪烁表示测量开始
-                        toggle_light = true;
-                        Flash_Yellow_LED();
-
-                        //if ( num1 < 620 && num1 > 600 )//数据的上下限---7-31-不要上下限，只需要高低电平来判断
-                        //{
-                        count++;
-
                         if (height_data_num < 512)//给测量的数据设了上限，512
                             height_data[height_data_num++] = num1;
                         else
                             height_data_num = 512;
                     }
-                }
-            
-                //else
-                //{
-                //count = 0;
-                // 黄灯停止闪烁
-                //toggle_light = false;
-                //}
-
-
-                if ( H_ok == false ) //dy----H_ok == false表示测量低电平,开始保存起来--7-31 
-                {
-
-                    if (height_data_num !=0 )
+                    else
                     {
-                        System.Diagnostics.Debug.WriteLine("===Saving!===");
-
-                        StreamWriter sw = new StreamWriter("knife" + Knife_num, false);//7-31--数据直接保存，只要在高电平，08里面。 
-                        for (int i = 0; i < height_data_num; i++)
+                        if (height_data_num != 0) //dy----H_ok == false表示测量低电平,开始保存起来--7-31 //tcp_SR = false;//不发送TCP--8-1
                         {
-                           sw.WriteLine("{0}", height_data[i]);
+                            System.Diagnostics.Debug.WriteLine("===Saving!===");
+                            StreamWriter sw = new StreamWriter("knife" + Knife_num, false);//7-31--数据直接保存，只要在高电平，08里面。 
+                            for (int i = 0; i < height_data_num; i++)
+                            {
+                                sw.WriteLine("{0}", height_data[i]);
+                            }
+                            Knife_num++;
+                            sw.Flush();
+                            sw.Close();
+                            height_data_num = 0;
+                            pictureBox_LED.Image = imageList1.Images[4];//保存文件显示蓝色指示灯
+
                         }
-                        Knife_num++;
-                        sw.Flush();
-                        sw.Close();
-                        height_data_num = 0;
-                        pictureBox_LED.Image = imageList1.Images[4];//保存文件显示蓝色指示灯
                     }
-                    
-
+                    tcp_SR = true;
                 }
-
-
-
-
+                //tcp_SR = true;//tcp-发送端继续发送
+                
+                
+                
             }
+
         }       
              
         //============================多线程相关函数=======================================
