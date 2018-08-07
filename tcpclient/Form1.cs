@@ -390,23 +390,21 @@ namespace tcpclient
                 */
                 if (tcp_SR)
                 {
-                    tcp_SR = false;
-                    //int i;
-                    //for (i = 0; i < count; i++)
-                    //{
+                    tcp_SR = false;//先关了bool判断
+                    
                     try
                     {
                         string txtContent = "M0";
                         strWriter.WriteLine(txtContent);//往当前的数据流中写入一行字符串
-                        richTextBox2.Text += "" + System.DateTime.Now.ToLongTimeString() + "指令：" + txtContent + "\n";
+                       // richTextBox2.Text += "" + System.DateTime.Now.ToLongTimeString() + "指令：" + txtContent + "\n";
                         strWriter.Flush();//刷新当前数据流中的数据，释放网络流对象                                      
-                        Thread.Sleep(1000);
+                        Thread.Sleep(100);
                     }
                     catch (Exception ex)
                     {
                         MessageBox.Show(ex.Message, "异常操作！");
                     }
-                    // }
+                    
                 }
 
             }
@@ -488,9 +486,6 @@ namespace tcpclient
 
                 //     }
                 //}
-
-
-
                 
                     //tcp_SR = false;//tcp-发送端先不发送
                 try
@@ -509,7 +504,7 @@ namespace tcpclient
                 }
 
                 string message = System.Text.Encoding.UTF8.GetString(bytes, 0, bytesRead);
-                richTextBox2.Text += "------Port data right------\n";
+                //richTextBox2.Text += "------Port data right------\n";
 
                 //dy--------------------M0测量值指令----------------
                 string[] sArray;
@@ -523,14 +518,14 @@ namespace tcpclient
                     float num = float.Parse(temp);
                     num1 = (600 - num / 100);//激光器的型号，IL300----600                   
                     //num1 = (300 - num / 100);
-                    richTextBox2.Text += "" + System.DateTime.Now.ToLongTimeString() + "测量值：" + num1 + "\n";//输出返回消息
+                    //richTextBox2.Text += "" + System.DateTime.Now.ToLongTimeString() + "测量值：" + num1 + "\n";//输出返回消息
                     // 黄灯闪烁表示测量开始
                     toggle_light = true;
                     Flash_Yellow_LED();
 
                     //if ( num1 < 620 && num1 > 600 )//数据的上下限---7-31-不要上下限，只需要高低电平来判断
                     //{
-                    count++;
+                    //count++;
 
                     if (H_ok)
                     {
@@ -554,15 +549,12 @@ namespace tcpclient
                             sw.Close();
                             height_data_num = 0;
                             pictureBox_LED.Image = imageList1.Images[4];//保存文件显示蓝色指示灯
-
+                            richTextBox2.Text += "" + System.DateTime.Now.ToLongTimeString() + "数据已保存" + Knife_num + "\n";
                         }
                     }
                     tcp_SR = true;
                 }
-                //tcp_SR = true;//tcp-发送端继续发送
-                
-                
-                
+                //tcp_SR = true;//tcp-发送端继续发送                             
             }
 
         }       
